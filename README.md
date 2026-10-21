@@ -34,6 +34,15 @@ Outputs are written to `../out/bootshim` by default. A successful host build
 only confirms that the source linked and the image-format assertions passed;
 it does not prove that the image is safe or functional on the phone.
 
+Run the host-side parser and fail-closed interface tests with:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+The legacy A04BR3-specific handoff, display, and firmware tests are skipped
+until those features are independently ported to this device.
+
 ## Safety boundary in this milestone
 
 The legacy build still compiles the ADT, handoff, and RNG interface modules,
