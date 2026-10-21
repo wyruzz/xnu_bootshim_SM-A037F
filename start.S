@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * AArch64 Image framing follows dipa-studio/ios-sweet (see CREDITS.md).
- * This entry supports the observed MT8167 EL2 handoff and EL1 diagnostics.
+ * Diagnostic entry only: accepts EL1 or EL2 and does not transition levels.
  */
 .section .text.head, "ax"
 .global _head
@@ -51,40 +51,7 @@ halt:
     wfe
     b halt
 
-/* Enter the EL1h state required by XNU start_first_cpu; x0 retains the FDT.
- * Called only with EL2 MMU and caches off, as checked by shim_main.
- */
-.global enter_el1
-enter_el1:
-    mov x1, #(1 << 31)
-    msr hcr_el2, x1
-    mov x1, #3
-    msr cnthctl_el2, x1
-    msr cntvoff_el2, xzr
-    mov x1, #0x33ff
-    msr cptr_el2, x1
-    msr hstr_el2, xzr
-    msr vttbr_el2, xzr
-    mov x1, #0x0800
-    movk x1, #0x30d0, lsl #16
-    msr sctlr_el1, x1
-    adr x1, vectors
-    msr vbar_el1, x1
-    adr x1, _stack_top
-    msr sp_el1, x1
-    adr x1, el1_start
-    msr elr_el2, x1
-    mov x1, #0x3c5
-    msr spsr_el2, x1
-    dsb sy
-    isb
-    eret
-el1_start:
-    mov x29, xzr
-    mov x30, xzr
-    bl shim_el1
-    b halt
-
+/* No exception-level transition is implemented in the diagnostic milestone. */
 .macro vector slot
     .balign 128
     mov x0, #\slot
