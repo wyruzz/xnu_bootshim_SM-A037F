@@ -8,6 +8,12 @@
 
 static struct fdt_info observed_fdt;
 
+#define FDT_PROBE_MAX 0x100000UL
+/* Temporary diagnostic window: 0x40000000 + 0x100000000 bytes of DRAM.
+ * Leave a full FDT_PROBE_MAX window before the end to bound parser reads. */
+#define DRAM_START 0x40000000ULL
+#define DRAM_END   0x140000000ULL
+
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
 #define UART_BASE ((uintptr_t)0x11020000)
 #define UART_LSR (UART_BASE + 0x14)
@@ -119,8 +125,8 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
     value("CNTVCT_EL0", READ_SYSREG(CNTVCT_EL0));
     value("DTB", dtb);
     /* Restrict all speculative input parsing to the known low DRAM window. */
-    if (dtb < 0x40000000 || dtb > 0x13fff0000ULL || (dtb & 7) ||
-        fdt_inspect((const void *)(uintptr_t)dtb, 0x100000, &observed_fdt)) {
+    if (dtb < DRAM_START || dtb > DRAM_END - FDT_PROBE_MAX || (dtb & 7) ||
+        fdt_inspect((const void *)(uintptr_t)dtb, FDT_PROBE_MAX, &observed_fdt)) {
         puts_uart("FDT_INVALID\n");
         stop();
     }
