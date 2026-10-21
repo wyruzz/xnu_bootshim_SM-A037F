@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT
  * Interfaces follow Apple xnu-8796.141.3 pexpert/arm64/boot.h.
  */
-#ifndef A04BR3_HANDOFF_H
-#define A04BR3_HANDOFF_H
+#ifndef XNU_BOOTSHIM_HANDOFF_H
+#define XNU_BOOTSHIM_HANDOFF_H
 #include <stddef.h>
 #include <stdint.h>
 #include "fdt.h"
