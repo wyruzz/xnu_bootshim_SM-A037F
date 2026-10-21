@@ -63,8 +63,18 @@ addresses and board metadata from being used accidentally.
 `start.S` no longer contains the donor EL2-to-EL1 transition. Both EL1 and
 EL2 paths are diagnostic-only. The build script is unchanged.
 
+## Image header caveat
+
+The 64-byte header follows the Linux arm64 Image layout. Its current
+`flags = 0xA` encodes the Linux header's 4 KiB page-size field and bit 3
+(physical-placement policy). Those bits describe this shim image's header,
+not XNU's eventual VM page size. The actual Samsung/LK loading path has not
+been verified to consume these fields, so they are documented as inherited
+values rather than changed speculatively.
+
 ## Not yet implemented or verified
 
+- Whether the target boot path interprets the Linux arm64 Image header flags. 
 - Target-specific XNU handoff, Apple device tree/ADT, and memory layout.
 - EL2-to-EL1 transition on the SM-A037F.
 - UART output and FDT diagnostics on physical hardware.
