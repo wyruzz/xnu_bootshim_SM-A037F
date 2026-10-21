@@ -83,7 +83,6 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
     value("MIDR_EL1", READ_SYSREG(MIDR_EL1));
     value("MPIDR_EL1", READ_SYSREG(MPIDR_EL1));
     value("ID_AA64ISAR0_EL1", READ_SYSREG(ID_AA64ISAR0_EL1));
-    value("ID_AA64ISAR1_EL1", READ_SYSREG(ID_AA64ISAR1_EL1));
     value("ID_AA64PFR0_EL1", READ_SYSREG(ID_AA64PFR0_EL1));
     value("ID_AA64MMFR0_EL1", READ_SYSREG(ID_AA64MMFR0_EL1));
     value("CNTFRQ_EL0", READ_SYSREG(CNTFRQ_EL0));
@@ -120,7 +119,7 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
     value("CNTVCT_EL0", READ_SYSREG(CNTVCT_EL0));
     value("DTB", dtb);
     /* Restrict all speculative input parsing to the known low DRAM window. */
-    if (dtb < 0x40000000 || dtb > 0x7ff00000 || (dtb & 7) ||
+    if (dtb < 0x40000000 || dtb > 0x13fff0000ULL || (dtb & 7) ||
         fdt_inspect((const void *)(uintptr_t)dtb, 0x100000, &observed_fdt)) {
         puts_uart("FDT_INVALID\n");
         stop();
