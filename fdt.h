@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef A04BR3_FDT_H
-#define A04BR3_FDT_H
+#ifndef XNU_BOOTSHIM_FDT_H
+#define XNU_BOOTSHIM_FDT_H
 #include <stddef.h>
 #include <stdint.h>
 #define FDT_MAX_MEMORY 8
