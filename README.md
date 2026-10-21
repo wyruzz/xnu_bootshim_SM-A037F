@@ -34,6 +34,17 @@ Outputs are written to `../out/bootshim` by default. A successful host build
 only confirms that the source linked and the image-format assertions passed;
 it does not prove that the image is safe or functional on the phone.
 
+## Safety boundary in this milestone
+
+The legacy build still compiles the ADT, handoff, and RNG interface modules,
+but they are fail-closed stubs: ADT generation returns failure, handoff
+validation rejects all payloads, framebuffer setup does nothing, and the RNG
+stub performs no register access. This prevents the previous A04BR3/MT8167
+addresses and board metadata from being used accidentally.
+
+`start.S` no longer contains the donor EL2-to-EL1 transition. Both EL1 and
+EL2 paths are diagnostic-only. The build script is unchanged.
+
 ## Not yet implemented or verified
 
 - Target-specific XNU handoff, Apple device tree/ADT, and memory layout.
