@@ -15,7 +15,8 @@ static struct fdt_info observed_fdt;
 #define DRAM_END   0x140000000ULL
 
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
-#define UART_BASE ((uintptr_t)0x11020000)
+/* SM-A037F DT reg and Linux sysfs both identify UART0 at 0x11002000. */
+#define UART_BASE ((uintptr_t)0x11002000)
 #define UART_LSR (UART_BASE + 0x14)
 #define UART_TX_READY (1u << 5)
 
