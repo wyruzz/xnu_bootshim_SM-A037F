@@ -93,15 +93,12 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
     else value("SCTLR_EL1", READ_SYSREG(SCTLR_EL1));
     puts_uart("SHIM_DIAGNOSTIC_DONE\n");
     if (el == 8) {
-        /* Do not discard live mappings or dirty cache data inherited from LK. */
-        if (READ_SYSREG(SCTLR_EL2) & ((1u << 0) | (1u << 2) | (1u << 12))) {
-            puts_uart("EL1_TRANSITION_REFUSED_MMU_OR_CACHE_ON\n");
-            stop();
-        }
-        value("HCR_EL2_before", READ_SYSREG(HCR_EL2));
-        value("CNTHCTL_EL2_before", READ_SYSREG(CNTHCTL_EL2));
-        puts_uart("ENTER_EL1\n");
-        enter_el1(x0);
+        /* Stage 1 is observational only: do not change exception level or
+         * inherited MMU, cache, timer, interrupt, or clock state. */
+        value("HCR_EL2", READ_SYSREG(HCR_EL2));
+        value("CNTHCTL_EL2", READ_SYSREG(CNTHCTL_EL2));
+        puts_uart("EL2_DIAGNOSTIC_ONLY_STOP\n");
+        stop();
     }
     if (el == 4) {
         extern void shim_el1(uint64_t dtb);
