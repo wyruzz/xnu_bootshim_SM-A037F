@@ -6,7 +6,6 @@
 #include "fdt.h"
 #include "handoff.h"
 
-__attribute__((noreturn)) void enter_el1(uint64_t dtb);
 static struct fdt_info observed_fdt;
 
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
