@@ -74,7 +74,7 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
                                         uint64_t x2, uint64_t x3, uint64_t old_sp)
 {
     uint64_t el = READ_SYSREG(CurrentEL);
-    puts_uart("\nXNU_A04BR3_SHIM_DIAGNOSTIC_V1\n");
+    puts_uart("\nXNU_SM_A037F_SHIM_DIAGNOSTIC_V1\n");
     value("CurrentEL", el);
     value("entry_x0", x0);
     value("entry_x1", x1);
@@ -113,7 +113,7 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
 
 __attribute__((noreturn)) void shim_el1(uint64_t dtb)
 {
-    puts_uart("XNU_A04BR3_EL1_DIAGNOSTIC_V2\n");
+    puts_uart("XNU_SM_A037F_EL1_DIAGNOSTIC_V1\n");
     value("CurrentEL", READ_SYSREG(CurrentEL));
     if (READ_SYSREG(CurrentEL) != 4) {
         puts_uart("EL1_DIAGNOSTIC_WRONG_EXCEPTION_LEVEL\n");
@@ -143,8 +143,6 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
     value("FDT_initrd_start", observed_fdt.initrd_start);
     value("FDT_initrd_end", observed_fdt.initrd_end);
     puts_uart("SHIM_EL1_DIAGNOSTIC_DONE\n");
-    const char *result = handoff_boot(&observed_fdt, dtb);
-    puts_uart(result);
-    puts_uart("\n");
+    puts_uart("DIAGNOSTIC_ONLY_HANDOFF_DISABLED\n");
     stop();
 }
