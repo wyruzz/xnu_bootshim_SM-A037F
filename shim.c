@@ -8,8 +8,15 @@
 
 static struct fdt_info observed_fdt;
 
+#define FDT_PROBE_MAX 0x100000UL
+/* Temporary diagnostic window: 0x40000000 + 0x100000000 bytes of DRAM.
+ * Leave a full FDT_PROBE_MAX window before the end to bound parser reads. */
+#define DRAM_START 0x40000000ULL
+#define DRAM_END   0x140000000ULL
+
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
-#define UART_BASE ((uintptr_t)0x11020000)
+/* SM-A037F DT reg and Linux sysfs both identify UART0 at 0x11002000. */
+#define UART_BASE ((uintptr_t)0x11002000)
 #define UART_LSR (UART_BASE + 0x14)
 #define UART_TX_READY (1u << 5)
 
@@ -54,25 +61,47 @@ __attribute__((noreturn)) static void stop(void)
 __attribute__((noreturn)) void exception_report(uint64_t slot)
 {
     uint64_t el = READ_SYSREG(CurrentEL);
+    uint64_t esr, elr, far;
+
+    /* The vector may be entered before shim_main checks MMU state. */
+    if (el == 8) {
+        if (READ_SYSREG(SCTLR_EL2) & 1U) stop();
+        esr = READ_SYSREG(ESR_EL2);
+        elr = READ_SYSREG(ELR_EL2);
+        far = READ_SYSREG(FAR_EL2);
+    } else if (el == 4) {
+        if (READ_SYSREG(SCTLR_EL1) & 1U) stop();
+        esr = READ_SYSREG(ESR_EL1);
+        elr = READ_SYSREG(ELR_EL1);
+        far = READ_SYSREG(FAR_EL1);
+    } else {
+        stop();
+    }
+
+    /* Do not retry UART MMIO if the UART register access itself faulted. */
+    if ((esr >> 26) == 0x25U &&
+        (((esr >> 10) & 1U) || far == UART_BASE || far == UART_LSR))
+        stop();
+
     puts_uart("XNU_SHIM_EXCEPTION\n");
     value("vector", slot);
     value("CurrentEL", el);
-    if (el == 8) {
-        value("ESR_EL2", READ_SYSREG(ESR_EL2));
-        value("ELR_EL2", READ_SYSREG(ELR_EL2));
-        value("FAR_EL2", READ_SYSREG(FAR_EL2));
-    } else {
-        value("ESR_EL1", READ_SYSREG(ESR_EL1));
-        value("ELR_EL1", READ_SYSREG(ELR_EL1));
-        value("FAR_EL1", READ_SYSREG(FAR_EL1));
-    }
+    value("ESR", esr);
+    value("ELR", elr);
+    value("FAR", far);
     stop();
 }
-
 __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
                                         uint64_t x2, uint64_t x3, uint64_t old_sp)
 {
     uint64_t el = READ_SYSREG(CurrentEL);
+    /* UART_BASE is a physical MMIO address. Do not touch it before proving
+     * the active exception level has its MMU disabled; this prototype has no
+     * verified virtual mapping for UART. Fail silently if that prerequisite
+     * is not met, because printing the reason would itself access the UART. */
+    uint64_t sctlr = el == 8 ? READ_SYSREG(SCTLR_EL2) : READ_SYSREG(SCTLR_EL1);
+    if ((el != 8 && el != 4) || (sctlr & 1U)) stop();
+
     puts_uart("\nXNU_SM_A037F_SHIM_DIAGNOSTIC_V1\n");
     value("CurrentEL", el);
     value("entry_x0", x0);
@@ -114,13 +143,21 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
         puts_uart("EL1_DIAGNOSTIC_WRONG_EXCEPTION_LEVEL\n");
         stop();
     }
-    value("SCTLR_EL1", READ_SYSREG(SCTLR_EL1));
+    uint64_t sctlr_el1 = READ_SYSREG(SCTLR_EL1);
+    value("SCTLR_EL1", sctlr_el1);
+    if (sctlr_el1 & 1U) {
+        /* x0 is expected to be a physical DTB address. Without a known
+         * identity mapping, dereferencing it while the MMU is enabled is
+         * unsafe; report the condition and fail closed. */
+        puts_uart("FDT_SKIP_MMU_ENABLED\n");
+        stop();
+    }
     value("CNTFRQ_EL0", READ_SYSREG(CNTFRQ_EL0));
     value("CNTVCT_EL0", READ_SYSREG(CNTVCT_EL0));
     value("DTB", dtb);
     /* Restrict all speculative input parsing to the known low DRAM window. */
-    if (dtb < 0x40000000 || dtb > 0x13fff0000ULL || (dtb & 7) ||
-        fdt_inspect((const void *)(uintptr_t)dtb, 0x100000, &observed_fdt)) {
+    if (dtb < DRAM_START || dtb > DRAM_END - FDT_PROBE_MAX || (dtb & 7) ||
+        fdt_inspect((const void *)(uintptr_t)dtb, FDT_PROBE_MAX, &observed_fdt)) {
         puts_uart("FDT_INVALID\n");
         stop();
     }

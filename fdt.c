@@ -3,25 +3,33 @@
  */
 #include "fdt.h"
 
+#define FDT_HEADER_SIZE 40U
+#define FDT_VERSION_SUPPORTED 17U
+#define FDT_MAX_TOTAL_SIZE 0x100000U
+
 static uint32_t be32(const unsigned char *p)
 {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
            ((uint32_t)p[2] << 8) | p[3];
 }
+
 static uint64_t be64(const unsigned char *p)
 {
     return ((uint64_t)be32(p) << 32) | be32(p + 4);
 }
+
 static int equal(const unsigned char *p, size_t n, const char *s)
 {
     size_t i = 0;
     while (i < n && s[i] && p[i] == (unsigned char)s[i]) i++;
     return i == n && !s[i];
 }
+
 static uint64_t cells(const unsigned char *p, unsigned count)
 {
     return count == 2 ? be64(p) : be32(p);
 }
+
 static int append(struct fdt_range *ranges, unsigned *count, unsigned max,
                   uint64_t base, uint64_t size)
 {
@@ -32,6 +40,12 @@ static int append(struct fdt_range *ranges, unsigned *count, unsigned max,
     (*count)++;
     return 0;
 }
+
+static int overlaps(size_t a, size_t a_end, size_t b, size_t b_end)
+{
+    return a < a_end && b < b_end && a < b_end && b < a_end;
+}
+
 struct frame {
     unsigned address_cells, size_cells, child_address_cells, child_size_cells;
     unsigned memory, reserved_root, reserved_child, chosen;
@@ -39,60 +53,108 @@ struct frame {
 
 int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
 {
+    if (!data || !info || available < FDT_HEADER_SIZE) return -1;
+
     const unsigned char *b = data;
     struct frame frames[16];
     unsigned depth = 0, root_seen = 0;
-    if (available < 40 || be32(b) != 0xd00dfeed) return -1;
-    uint32_t total = be32(b + 4), off = be32(b + 8), strings = be32(b + 12);
-    uint32_t reserve = be32(b + 16), ssize = be32(b + 32), tsize = be32(b + 36);
-    if (total > available || total > 0x100000 || total < 40 || be32(b + 20) != 17 ||
-        off < 40 || (off & 3) || off > total || tsize > total - off ||
-        strings > total || ssize > total - strings || reserve < 40 || (reserve & 7)) return -1;
+
+    if (be32(b) != 0xd00dfeed) return -1;
+
+    uint32_t total = be32(b + 4);
+    uint32_t off = be32(b + 8);
+    uint32_t strings = be32(b + 12);
+    uint32_t reserve_start = be32(b + 16);
+    uint32_t version = be32(b + 20);
+    uint32_t last_compatible = be32(b + 24);
+    uint32_t ssize = be32(b + 32);
+    uint32_t tsize = be32(b + 36);
+
+    if (total > available || total > FDT_MAX_TOTAL_SIZE ||
+        total < FDT_HEADER_SIZE || version < FDT_VERSION_SUPPORTED ||
+        last_compatible > FDT_VERSION_SUPPORTED ||
+        off < FDT_HEADER_SIZE || (off & 3) || off > total ||
+        tsize > total - off ||
+        strings < FDT_HEADER_SIZE || strings > total ||
+        ssize > total - strings ||
+        reserve_start < FDT_HEADER_SIZE || (reserve_start & 7) ||
+        !tsize)
+        return -1;
+
     info->bytes = total;
     info->memory_count = info->reserved_count = 0;
     info->initrd_start = info->initrd_end = 0;
+
+    size_t reserve = reserve_start;
     for (;;) {
         if (reserve > total || total - reserve < 16) return -1;
-        uint64_t base = be64(b + reserve), size = be64(b + reserve + 8);
+        uint64_t base = be64(b + reserve);
+        uint64_t size = be64(b + reserve + 8);
         reserve += 16;
         if (!base && !size) break;
-        if (append(info->reserved, &info->reserved_count, FDT_MAX_RESERVED, base, size)) return -1;
+        if (append(info->reserved, &info->reserved_count,
+                   FDT_MAX_RESERVED, base, size))
+            return -1;
     }
-    size_t end = off + tsize, p = off;
+
+    size_t structure_end = (size_t)off + tsize;
+    size_t strings_end = (size_t)strings + ssize;
+    if (overlaps(0, FDT_HEADER_SIZE, off, structure_end) ||
+        overlaps(0, FDT_HEADER_SIZE, strings, strings_end) ||
+        overlaps(reserve_start, reserve, off, structure_end) ||
+        overlaps(reserve_start, reserve, strings, strings_end) ||
+        overlaps(off, structure_end, strings, strings_end))
+        return -1;
+
+    size_t end = structure_end, p = off;
     while (p <= end && end - p >= 4) {
         unsigned token = be32(b + p);
         p += 4;
+
         if (token == 1) { /* BEGIN_NODE */
             if (depth == 16 || (!depth && root_seen)) return -1;
             size_t name = p;
             while (p < end && b[p]) p++;
             if (p == end) return -1;
+
             size_t length = p - name;
             struct frame *f = &frames[depth];
             f->address_cells = depth ? frames[depth - 1].child_address_cells : 2;
             f->size_cells = depth ? frames[depth - 1].child_size_cells : 1;
             f->child_address_cells = 2;
             f->child_size_cells = 1;
+
             size_t kind_length = 0;
-            while (kind_length < length && b[name + kind_length] != '@') kind_length++;
+            while (kind_length < length && b[name + kind_length] != '@')
+                kind_length++;
+
             f->memory = depth == 1 && equal(b + name, kind_length, "memory");
             f->reserved_root = depth == 1 && equal(b + name, length, "reserved-memory");
             f->reserved_child = depth == 2 && frames[1].reserved_root;
             f->chosen = depth == 1 && equal(b + name, length, "chosen");
-            if (!depth) { if (length) return -1; root_seen = 1; }
+            if (!depth) {
+                if (length) return -1;
+                root_seen = 1;
+            }
             depth++;
             p = (p + 4) & ~(size_t)3;
+            if (p > end) return -1;
+
         } else if (token == 2) { /* END_NODE */
             if (!depth) return -1;
             depth--;
+
         } else if (token == 3) { /* PROP */
             if (!depth || end - p < 8) return -1;
-            uint32_t length = be32(b + p), name = be32(b + p + 4);
+            uint32_t length = be32(b + p);
+            uint32_t name = be32(b + p + 4);
             p += 8;
             if (length > end - p || name >= ssize) return -1;
+
             size_t n = 0;
             while (n < ssize - name && b[strings + name + n]) n++;
             if (n == ssize - name) return -1;
+
             const unsigned char *key = b + strings + name;
             struct frame *f = &frames[depth - 1];
             if (equal(key, n, "#address-cells")) {
@@ -108,8 +170,13 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
                     uint64_t base = cells(b + p + at, ac);
                     uint64_t size = cells(b + p + at + 4 * ac, sc);
                     if (f->memory) {
-                        if (append(info->memory, &info->memory_count, FDT_MAX_MEMORY, base, size)) return -1;
-                    } else if (append(info->reserved, &info->reserved_count, FDT_MAX_RESERVED, base, size)) return -1;
+                        if (append(info->memory, &info->memory_count,
+                                   FDT_MAX_MEMORY, base, size))
+                            return -1;
+                    } else if (append(info->reserved, &info->reserved_count,
+                                      FDT_MAX_RESERVED, base, size)) {
+                        return -1;
+                    }
                 }
             } else if (f->chosen && equal(key, n, "linux,initrd-start")) {
                 if (length != 4 && length != 8) return -1;
@@ -118,12 +185,19 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
                 if (length != 4 && length != 8) return -1;
                 info->initrd_end = cells(b + p, length / 4);
             }
+
             p = (p + length + 3) & ~(size_t)3;
+            if (p > end) return -1;
+
         } else if (token == 4) { /* NOP */
             continue;
+
         } else if (token == 9) { /* END */
-            return root_seen && !depth && info->memory_count ? 0 : -1;
-        } else return -1;
+            return p == end && root_seen && !depth && info->memory_count ? 0 : -1;
+
+        } else {
+            return -1;
+        }
     }
     return -1;
 }

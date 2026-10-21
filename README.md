@@ -8,18 +8,27 @@ XNU bootloader.
 
 ## Current behavior
 
-- Prints entry registers and CPU/system-register diagnostics over the inherited
-  MediaTek UART at `0x11020000`.
+- Attempts entry-register and CPU/system-register diagnostics over the MediaTek
+  UART whose DT `reg` and Linux sysfs platform-device address decode to
+  `0x11002000`. Early shim access, clocks, pin state, and external UART
+  visibility remain unverified; the address is a working hypothesis, not a
+  hardware-tested result.
 - If entered at EL2, reports EL2 state and stops without changing exception
   level or inherited MMU/cache/timer/clock state.
 - If entered at EL1, validates and reports the supplied flattened device tree
   (DRAM, reserved ranges and initrd fields), then stops.
+- FDT parsing is bounded to a 1 MiB probe window and rejects overlapping
+  header/structure/strings/reservation blocks and unsupported format versions.
 - Does not call `handoff_boot()`, load XNU, write storage, or intentionally
   change power/watchdog configuration.
 
 UART output requires a compatible external serial connection; it may not be
 visible through Android ADB. The inherited watchdog may reset the device after
 the shim stops.
+
+The current FDT probe window assumes DRAM spans `0x40000000` through
+`0x140000000`. This is a provisional diagnostic bound, not a validated memory
+map or permission to use that whole range for a future kernel handoff.
 
 ## Build
 
@@ -54,8 +63,18 @@ addresses and board metadata from being used accidentally.
 `start.S` no longer contains the donor EL2-to-EL1 transition. Both EL1 and
 EL2 paths are diagnostic-only. The build script is unchanged.
 
+## Image header caveat
+
+The 64-byte header follows the Linux arm64 Image layout. Its current
+`flags = 0xA` encodes the Linux header's 4 KiB page-size field and bit 3
+(physical-placement policy). Those bits describe this shim image's header,
+not XNU's eventual VM page size. The actual Samsung/LK loading path has not
+been verified to consume these fields, so they are documented as inherited
+values rather than changed speculatively.
+
 ## Not yet implemented or verified
 
+- Whether the target boot path interprets the Linux arm64 Image header flags. 
 - Target-specific XNU handoff, Apple device tree/ADT, and memory layout.
 - EL2-to-EL1 transition on the SM-A037F.
 - UART output and FDT diagnostics on physical hardware.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Synthetic parser fixture only; this is not the SM-A037F memory map.
 /dts-v1/;
 /memreserve/ 0x43000000 0x30000;
 / {
