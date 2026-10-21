@@ -1,0 +1,20 @@
+name: diagnostic-build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu device-tree-compiler
+      - name: Build AArch64 diagnostic image
+        run: CROSS_COMPILE=aarch64-linux-gnu- ./build.sh
+      - name: Run host-side tests
+        run: python3 -m unittest discover -s tests -v
