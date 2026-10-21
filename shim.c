@@ -80,6 +80,13 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
                                         uint64_t x2, uint64_t x3, uint64_t old_sp)
 {
     uint64_t el = READ_SYSREG(CurrentEL);
+    /* UART_BASE is a physical MMIO address. Do not touch it before proving
+     * the active exception level has its MMU disabled; this prototype has no
+     * verified virtual mapping for UART. Fail silently if that prerequisite
+     * is not met, because printing the reason would itself access the UART. */
+    uint64_t sctlr = el == 8 ? READ_SYSREG(SCTLR_EL2) : READ_SYSREG(SCTLR_EL1);
+    if ((el != 8 && el != 4) || (sctlr & 1U)) stop();
+
     puts_uart("\nXNU_SM_A037F_SHIM_DIAGNOSTIC_V1\n");
     value("CurrentEL", el);
     value("entry_x0", x0);
