@@ -8,8 +8,11 @@ XNU bootloader.
 
 ## Current behavior
 
-- Prints entry registers and CPU/system-register diagnostics over the inherited
-  MediaTek UART at `0x11020000`.
+- Attempts entry-register and CPU/system-register diagnostics over the MediaTek
+  UART whose DT `reg` and Linux sysfs platform-device address decode to
+  `0x11002000`. Early shim access, clocks, pin state, and external UART
+  visibility remain unverified; the address is a working hypothesis, not a
+  hardware-tested result.
 - If entered at EL2, reports EL2 state and stops without changing exception
   level or inherited MMU/cache/timer/clock state.
 - If entered at EL1, validates and reports the supplied flattened device tree
