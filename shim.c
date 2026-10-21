@@ -80,7 +80,7 @@ __attribute__((noreturn)) void exception_report(uint64_t slot)
 
     /* Do not retry UART MMIO if the UART register access itself faulted. */
     if ((esr >> 26) == 0x25U &&
-        (far == UART_BASE || far == UART_LSR))
+        (((esr >> 10) & 1U) || far == UART_BASE || far == UART_LSR))
         stop();
 
     puts_uart("XNU_SHIM_EXCEPTION\n");
