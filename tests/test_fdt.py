@@ -23,7 +23,7 @@ class Info(ctypes.Structure):
 class FdtTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory(prefix='a04br3-fdt-test-')
+        cls.temp = tempfile.TemporaryDirectory(prefix='fdt-parser-test-')
         out = Path(cls.temp.name)
         subprocess.run(['cc', '-shared', '-fPIC', '-O2', '-Wall', '-Wextra', '-Werror',
                         str(ROOT / 'fdt.c'), '-o', str(out / 'fdt.so')], check=True)
