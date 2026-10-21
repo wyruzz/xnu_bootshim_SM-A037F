@@ -14,12 +14,18 @@ XNU bootloader.
   level or inherited MMU/cache/timer/clock state.
 - If entered at EL1, validates and reports the supplied flattened device tree
   (DRAM, reserved ranges and initrd fields), then stops.
+- FDT parsing is bounded to a 1 MiB probe window and rejects overlapping
+  header/structure/strings/reservation blocks and unsupported format versions.
 - Does not call `handoff_boot()`, load XNU, write storage, or intentionally
   change power/watchdog configuration.
 
 UART output requires a compatible external serial connection; it may not be
 visible through Android ADB. The inherited watchdog may reset the device after
 the shim stops.
+
+The current FDT probe window assumes DRAM spans `0x40000000` through
+`0x140000000`. This is a provisional diagnostic bound, not a validated memory
+map or permission to use that whole range for a future kernel handoff.
 
 ## Build
 
