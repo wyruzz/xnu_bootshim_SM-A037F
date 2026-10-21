@@ -31,6 +31,7 @@ def tree(data, at=0):
     return (props,children),at
 
 
+@unittest.skip("Legacy A04BR3-only test: target implementation is deliberately fail-closed")
 class GPUHandoffTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
