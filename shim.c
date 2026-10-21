@@ -61,21 +61,36 @@ __attribute__((noreturn)) static void stop(void)
 __attribute__((noreturn)) void exception_report(uint64_t slot)
 {
     uint64_t el = READ_SYSREG(CurrentEL);
+    uint64_t esr, elr, far;
+
+    /* The vector may be entered before shim_main checks MMU state. */
+    if (el == 8) {
+        if (READ_SYSREG(SCTLR_EL2) & 1U) stop();
+        esr = READ_SYSREG(ESR_EL2);
+        elr = READ_SYSREG(ELR_EL2);
+        far = READ_SYSREG(FAR_EL2);
+    } else if (el == 4) {
+        if (READ_SYSREG(SCTLR_EL1) & 1U) stop();
+        esr = READ_SYSREG(ESR_EL1);
+        elr = READ_SYSREG(ELR_EL1);
+        far = READ_SYSREG(FAR_EL1);
+    } else {
+        stop();
+    }
+
+    /* Do not retry UART MMIO if the UART register access itself faulted. */
+    if ((esr >> 26) == 0x25U &&
+        (far == UART_BASE || far == UART_LSR))
+        stop();
+
     puts_uart("XNU_SHIM_EXCEPTION\n");
     value("vector", slot);
     value("CurrentEL", el);
-    if (el == 8) {
-        value("ESR_EL2", READ_SYSREG(ESR_EL2));
-        value("ELR_EL2", READ_SYSREG(ELR_EL2));
-        value("FAR_EL2", READ_SYSREG(FAR_EL2));
-    } else {
-        value("ESR_EL1", READ_SYSREG(ESR_EL1));
-        value("ELR_EL1", READ_SYSREG(ELR_EL1));
-        value("FAR_EL1", READ_SYSREG(FAR_EL1));
-    }
+    value("ESR", esr);
+    value("ELR", elr);
+    value("FAR", far);
     stop();
 }
-
 __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
                                         uint64_t x2, uint64_t x3, uint64_t old_sp)
 {
