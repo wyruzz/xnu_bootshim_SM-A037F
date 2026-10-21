@@ -120,7 +120,15 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
         puts_uart("EL1_DIAGNOSTIC_WRONG_EXCEPTION_LEVEL\n");
         stop();
     }
-    value("SCTLR_EL1", READ_SYSREG(SCTLR_EL1));
+    uint64_t sctlr_el1 = READ_SYSREG(SCTLR_EL1);
+    value("SCTLR_EL1", sctlr_el1);
+    if (sctlr_el1 & 1U) {
+        /* x0 is expected to be a physical DTB address. Without a known
+         * identity mapping, dereferencing it while the MMU is enabled is
+         * unsafe; report the condition and fail closed. */
+        puts_uart("FDT_SKIP_MMU_ENABLED\n");
+        stop();
+    }
     value("CNTFRQ_EL0", READ_SYSREG(CNTFRQ_EL0));
     value("CNTVCT_EL0", READ_SYSREG(CNTVCT_EL0));
     value("DTB", dtb);
