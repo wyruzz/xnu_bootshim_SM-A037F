@@ -1,6 +1,6 @@
 # Samsung Galaxy A03s SM-A037F diagnostic boot shim
 
-**Status: source adaptation in progress; not yet built or tested on hardware.**
+**Status: diagnostic-only; XNU boot is not implemented or hardware-tested.**
 
 This branch targets Samsung Galaxy A03s **SM-A037F** (MediaTek MT6765 /
 Helio P35). The current milestone is a diagnostic-only AArch64 image, not an
@@ -9,7 +9,8 @@ XNU bootloader.
 ## Current behavior
 
 - Prints entry registers and CPU/system-register diagnostics over the inherited
-  MediaTek UART at `0x11002000` (the `reg` base reported by the captured A03s Device Tree for `serial@11020000`; UART output is still unverified on hardware).
+  MediaTek UART at `0x11002000` (the `reg` base reported by the captured A03s
+  Device Tree for `serial@11020000`; UART output is still unverified on hardware).
 - If entered at EL2, reports EL2 state and stops without changing exception
   level or inherited MMU/cache/timer/clock state.
 - If entered at EL1, validates and reports the supplied flattened device tree
@@ -23,25 +24,28 @@ the shim stops.
 
 ## Build
 
-The existing `build.sh` is intentionally unchanged. Build with a working
-AArch64 bare-metal-capable toolchain, for example:
+On Linux with an AArch64 cross-toolchain:
 
 ```sh
-CROSS_COMPILE=/path/to/aarch64-linux-gnu- ./build.sh
+CROSS_COMPILE=aarch64-linux-gnu- ./build.sh
 ```
 
-Outputs are written to `../out/bootshim` by default. A successful host build
-only confirms that the source linked and the image-format assertions passed;
-it does not prove that the image is safe or functional on the phone.
-
-Run the host-side parser and fail-closed interface tests with:
+On macOS with Clang and MacPorts `aarch64-elf-binutils`:
 
 ```sh
-python3 -m unittest discover -s tests -v
+CROSS_COMPILE=aarch64-elf- SHIM_OUT="$PWD/out/bootshim-macos" ./build-macos.sh
 ```
 
-The legacy A04BR3-specific handoff, display, and firmware tests are skipped
-until those features are independently ported to this device.
+Both scripts link executable code as RX and writable state as RW, reject
+writable-and-executable ELF load segments, validate the AArch64 Image magic
+and image-size field, and emit `build.json` with a SHA-256 digest. A GitHub
+Actions workflow builds the image on each push and pull request.
+
+Outputs are a raw diagnostic `Image`, `shim.elf`, `symbols.txt`, and
+`build.json`. A successful host build only confirms the compile/link and
+format checks; it does not prove that the image is safe or functional on the
+phone. **The raw `Image` is not a complete Samsung boot image and must not be
+flashed directly.**
 
 ## Safety boundary in this milestone
 
@@ -51,16 +55,24 @@ validation rejects all payloads, framebuffer setup does nothing, and the RNG
 stub performs no register access. This prevents the previous A04BR3/MT8167
 addresses and board metadata from being used accidentally.
 
-`start.S` no longer contains the donor EL2-to-EL1 transition. Both EL1 and
-EL2 paths are diagnostic-only. The build script is unchanged.
+`start.S` accepts EL1 or EL2 but does not implement an EL2-to-EL1 transition.
+Both paths are diagnostic-only. The linker and build scripts enforce
+non-RWX ELF load segments; this is a build-safety improvement, not a kernel
+handoff implementation.
 
-## Not yet implemented or verified
+## Remaining blockers
 
-- Target-specific XNU handoff, Apple device tree/ADT, and memory layout.
-- EL2-to-EL1 transition on the SM-A037F.
-- UART output and FDT diagnostics on physical hardware.
-- Boot-image packaging, flashing, and kernel execution.
+These are not merely build errors and cannot be responsibly marked fixed without
+target-specific implementation and evidence:
 
-Do not treat this image as flash-ready. First build and inspect the output,
-then validate the entry behavior with an appropriate recovery path available.
+- Target-specific XNU handoff ABI, Apple device tree/ADT, payload loading and
+  verified memory layout.
+- A validated EL2-to-EL1 transition policy, if required by the eventual entry
+  contract.
+- UART initialization/address mapping and FDT diagnostics tested on physical
+  SM-A037F hardware.
+- Samsung/MediaTek boot-image packaging and a verified recovery/boot procedure.
+- End-to-end kernel execution tests on the actual phone.
 
+Do not treat this image as flash-ready. Keep testing host-side until the device
+entry contract, memory map, packaging, and recovery path have been verified.
