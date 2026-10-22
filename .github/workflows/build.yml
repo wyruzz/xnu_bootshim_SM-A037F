@@ -1,0 +1,38 @@
+name: diagnostic-shim-build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AArch64 cross-toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu python3
+      - name: Build diagnostic image
+        env:
+          CROSS_COMPILE: aarch64-linux-gnu-
+          SHIM_OUT: ${{ runner.temp }}/bootshim
+        run: ./build.sh
+      - name: Verify output metadata and ELF permissions
+        env:
+          SHIM_OUT: ${{ runner.temp }}/bootshim
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          out = Path(os.environ["SHIM_OUT"])
+          metadata = json.loads((out / "build.json").read_text())
+          image = (out / "Image").read_bytes()
+          assert metadata["kind"] == "diagnostic-shim"
+          assert metadata["bytes"] == len(image)
+          assert metadata["xnu_boot_verified"] is False
+          assert metadata["hardware_tested"] is False
+          assert image[56:60] == b"ARM\\x64"
+          print(json.dumps(metadata, indent=2))
+          PY
