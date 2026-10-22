@@ -95,10 +95,12 @@ class FdtTests(unittest.TestCase):
         # recognizes it as the matching property; malformed pairing must fail.
         bad = bytearray(self.blob)
         needle = b'linux,initrd-end\0'
+        start_needle = b'linux,initrd-start\0'
         strings_off = struct.unpack_from('>I', bad, 12)[0]
         strings_size = struct.unpack_from('>I', bad, 32)[0]
         string_table = bytes(bad[strings_off:strings_off + strings_size])
         name_offset = string_table.index(needle)
+        start_name_offset = string_table.index(start_needle)
         struct_off = struct.unpack_from('>I', bad, 8)[0]
         struct_size = struct.unpack_from('>I', bad, 36)[0]
         struct_end = struct_off + struct_size
@@ -106,7 +108,7 @@ class FdtTests(unittest.TestCase):
             if struct.unpack_from('>I', bad, pos)[0] == 3:
                 prop_name = struct.unpack_from('>I', bad, pos + 8)[0]
                 if prop_name == name_offset:
-                    struct.pack_into('>I', bad, pos + 8, 0)
+                    struct.pack_into('>I', bad, pos + 8, start_name_offset)
                     break
         self.assertNotEqual(self.inspect(bytes(bad))[0], 0)
 
