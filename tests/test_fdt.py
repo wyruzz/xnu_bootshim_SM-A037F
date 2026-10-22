@@ -78,11 +78,37 @@ class FdtTests(unittest.TestCase):
     def test_header_bounds_and_version(self):
         for offset, value in ((0, 0), (4, 0xffffffff), (8, 0xfffffff0),
                               (12, 0xffffffff), (16, 0xffffffff), (20, 16),
-                              (32, 0xffffffff), (36, 0xffffffff)):
+                              (24, 18), (32, 0xffffffff), (36, 0xffffffff)):
             bad = bytearray(self.blob)
             struct.pack_into('>I', bad, offset, value)
             with self.subTest(offset=offset):
                 self.assertNotEqual(self.inspect(bytes(bad))[0], 0)
+
+    def test_reversed_initrd_range_is_rejected(self):
+        bad = self.blob.replace(struct.pack('>II', 0, 0x47001000),
+                                struct.pack('>II', 0, 0x46ffffff), 1)
+        self.assertNotEqual(bad, self.blob)
+        self.assertNotEqual(self.inspect(bad)[0], 0)
+
+    def test_unpaired_initrd_properties_are_rejected(self):
+        # Corrupt the initrd end property's name offset so the parser no longer
+        # recognizes it as the matching property; malformed pairing must fail.
+        bad = bytearray(self.blob)
+        needle = b'linux,initrd-end\\0'
+        strings_off = struct.unpack_from('>I', bad, 12)[0]
+        strings_size = struct.unpack_from('>I', bad, 32)[0]
+        string_table = bytes(bad[strings_off:strings_off + strings_size])
+        name_offset = string_table.index(needle)
+        struct_off = struct.unpack_from('>I', bad, 8)[0]
+        struct_size = struct.unpack_from('>I', bad, 36)[0]
+        struct_end = struct_off + struct_size
+        for pos in range(struct_off, struct_end - 12, 4):
+            if struct.unpack_from('>I', bad, pos)[0] == 3:
+                prop_name = struct.unpack_from('>I', bad, pos + 8)[0]
+                if prop_name == name_offset:
+                    struct.pack_into('>I', bad, pos + 8, 0)
+                    break
+        self.assertNotEqual(self.inspect(bytes(bad))[0], 0)
 
     def test_unsupported_memory_cells_are_rejected(self):
         bad = self.blob.replace(struct.pack('>4I', 0, 0x40000000, 0, 0x40000000),
