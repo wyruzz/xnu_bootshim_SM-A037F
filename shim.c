@@ -9,7 +9,8 @@
 static struct fdt_info observed_fdt;
 
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
-#define UART_BASE ((uintptr_t)0x11020000)
+/* A03s live Device Tree: serial@11020000 has reg = <0 0x11002000 0 0x1000>. */
+#define UART_BASE ((uintptr_t)0x11002000)
 #define UART_LSR (UART_BASE + 0x14)
 #define UART_TX_READY (1u << 5)
 
