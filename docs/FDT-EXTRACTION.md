@@ -14,8 +14,11 @@ The read-only function `fdt_inspect()` in `fdt.c` reads:
 - `linux,initrd-start` and `linux,initrd-end` under `/chosen`.
 
 It does not yet resolve UART `clocks` or `pinctrl-0` phandles, decode UART
-register properties, interpret dynamic reserved-memory nodes that use `size`
-instead of `reg`, or prove that an FDT pointer is mapped and safe to read.
+register properties, or prove that an FDT pointer is mapped and safe to read.
+Dynamic `/reserved-memory` children with `size` and no `reg` are now reported
+separately with their size, alignment, and allocation constraints; they are not
+converted into fixed address ranges because their actual allocated bases are
+not encoded by those properties.
 
 ## Important: test fixture is synthetic
 
