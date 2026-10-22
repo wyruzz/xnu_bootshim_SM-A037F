@@ -13,10 +13,17 @@ class Range(ctypes.Structure):
     _fields_ = [('base', ctypes.c_uint64), ('size', ctypes.c_uint64)]
 
 
+class DynamicReservation(ctypes.Structure):
+    _fields_ = [('size', ctypes.c_uint64), ('alignment', ctypes.c_uint64),
+                ('alloc_range_count', ctypes.c_uint), ('alloc_ranges', Range * 8)]
+
+
 class Info(ctypes.Structure):
     _fields_ = [('bytes', ctypes.c_uint32), ('memory_count', ctypes.c_uint),
-                ('reserved_count', ctypes.c_uint), ('memory', Range * 8),
-                ('reserved', Range * 64), ('initrd_start', ctypes.c_uint64),
+                ('reserved_count', ctypes.c_uint), ('dynamic_reserved_count', ctypes.c_uint),
+                ('memory', Range * 8), ('reserved', Range * 64),
+                ('dynamic_reserved', DynamicReservation * 16),
+                ('initrd_start', ctypes.c_uint64),
                 ('initrd_end', ctypes.c_uint64)]
 
 
@@ -51,6 +58,18 @@ class FdtTests(unittest.TestCase):
         self.assertEqual([(r.base, r.size) for r in info.reserved[:info.reserved_count]],
                          [(0x43000000, 0x30000), (0x44410000, 0xe0000)])
         self.assertEqual((info.initrd_start, info.initrd_end), (0x47000000, 0x47001000))
+        self.assertEqual(info.dynamic_reserved_count, 2)
+        self.assertEqual((info.dynamic_reserved[0].size, info.dynamic_reserved[0].alignment),
+                         (0x1800000, 0x1000000))
+        self.assertEqual(info.dynamic_reserved[0].alloc_range_count, 1)
+        self.assertEqual((info.dynamic_reserved[0].alloc_ranges[0].base,
+                          info.dynamic_reserved[0].alloc_ranges[0].size),
+                         (0x40000000, 0x80000000))
+        self.assertEqual((info.dynamic_reserved[1].size, info.dynamic_reserved[1].alignment),
+                         (0x300000, 0))
+        self.assertEqual((info.dynamic_reserved[1].alloc_ranges[0].base,
+                          info.dynamic_reserved[1].alloc_ranges[0].size),
+                         (0x40000000, 0x50000000))
 
     def test_every_truncation_is_rejected(self):
         for length in range(len(self.blob)):
