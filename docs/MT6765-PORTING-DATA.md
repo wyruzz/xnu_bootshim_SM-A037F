@@ -21,7 +21,7 @@ the A03s device tree, bootloader behavior, and memory reservations.
 | Recovery partition | `/dev/block/mmcblk0p38` | Device partition symlink dump |
 | DTB serial node 1 | node `serial@11020000`; `reg` base `0x11002000`, size `0x1000` | A03s live device-tree property dump; node label differs from `reg` address |
 | DTB serial node 2 | node `serial@11030000`; `reg` base `0x11003000`, size `0x1000` | A03s live device-tree property dump |
-| UART clock names | `baud`, `bus` | DTB properties; phandles `0x24`, `0x25`, `0x16` for node 1 and `0x24`, `0x25`, `0x17` for node 2 |
+| UART clock names | `baud`, `bus` | `clk26m` phandle `0x24` has zero clock cells; `infracfg_ao` phandle `0x25` has one clock cell, so `0x16` / `0x17` are provider arguments, not phandles |
 | DRAM base and size | base `0x40000000`, size `0x100000000` (4 GiB) | `/memory/reg` decoded with root `#address-cells = 2`, `#size-cells = 2` |
 | Reserved memory ranges | Multiple fixed ranges, including ATF/TEE, framebuffer, boot arguments, logs, modem and SCP regions | `/reserved-memory/*/reg` in captured device-tree property tree; see `docs/FDT-EXTRACTION.md` |
 | Initrd range | `0x51B00000` to `0x51C61B0D` (end address as encoded) | `/chosen/linux,initrd-start` and `linux,initrd-end` |
@@ -37,7 +37,8 @@ file in this archive. The extracted property tree reports root `#address-cells`
 and `#size-cells` as 2 each, model `MT6765V/WB`, and compatible
 `mediatek,MT6765`.
 
-Important UART detail: the first node is named `serial@11020000`, but its
+Important UART detail: both nodes use compatible strings `mediatek,mt6758-uart`
+and `mediatek,mt6577-uart`. The first node is named `serial@11020000`, but its
 `reg` property explicitly encodes base `0x11002000` and size `0x1000`. The
 shim's old `UART_BASE=0x11020000` disagreed with that hardware property and has
 been corrected to `0x11002000`. This confirms the register base from the
