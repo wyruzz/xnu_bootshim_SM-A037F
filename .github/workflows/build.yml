@@ -33,6 +33,6 @@ jobs:
           assert metadata["bytes"] == len(image)
           assert metadata["xnu_boot_verified"] is False
           assert metadata["hardware_tested"] is False
-          assert image[56:60] == b"ARM\\x64"
+          assert image[56:60] == b"ARM\x64"
           print(json.dumps(metadata, indent=2))
           PY
