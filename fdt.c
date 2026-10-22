@@ -52,7 +52,10 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
     if (!data || !info || available < 40 || be32(b) != 0xd00dfeed) return -1;
     uint32_t total = be32(b + 4), off = be32(b + 8), strings = be32(b + 12);
     uint32_t reserve = be32(b + 16), ssize = be32(b + 32), tsize = be32(b + 36);
-    if (total > available || total > 0x100000 || total < 40 || be32(b + 20) != 17 ||
+    uint32_t version = be32(b + 20), last_compatible = be32(b + 24);
+    unsigned has_initrd_start = 0, has_initrd_end = 0;
+    if (total > available || total > 0x100000 || total < 40 || version != 17 ||
+        last_compatible > version ||
         off < 40 || (off & 3) || off > total || tsize > total - off ||
         strings < 40 || strings > total || ssize > total - strings ||
         reserve < 40 || (reserve & 7)) return -1;
@@ -156,15 +159,21 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
             } else if (f->chosen && equal(key, n, "linux,initrd-start")) {
                 if (length != 4 && length != 8) return -1;
                 info->initrd_start = cells(b + p, length / 4);
+                has_initrd_start = 1;
             } else if (f->chosen && equal(key, n, "linux,initrd-end")) {
                 if (length != 4 && length != 8) return -1;
                 info->initrd_end = cells(b + p, length / 4);
+                has_initrd_end = 1;
             }
             p = (p + length + 3) & ~(size_t)3;
         } else if (token == 4) { /* NOP */
             continue;
         } else if (token == 9) { /* END */
-            return root_seen && !depth && info->memory_count ? 0 : -1;
+            if (!root_seen || depth || !info->memory_count ||
+                has_initrd_start != has_initrd_end ||
+                (has_initrd_start && info->initrd_end < info->initrd_start))
+                return -1;
+            return 0;
         } else return -1;
     }
     return -1;
