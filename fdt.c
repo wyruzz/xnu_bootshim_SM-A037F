@@ -35,6 +35,9 @@ static int append(struct fdt_range *ranges, unsigned *count, unsigned max,
 struct frame {
     unsigned address_cells, size_cells, child_address_cells, child_size_cells;
     unsigned memory, reserved_root, reserved_child, chosen;
+    unsigned has_reg, alloc_range_count;
+    uint64_t dynamic_size, dynamic_alignment;
+    struct fdt_range alloc_ranges[FDT_MAX_ALLOC_RANGES];
 };
 
 int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
@@ -49,7 +52,7 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
         off < 40 || (off & 3) || off > total || tsize > total - off ||
         strings > total || ssize > total - strings || reserve < 40 || (reserve & 7)) return -1;
     info->bytes = total;
-    info->memory_count = info->reserved_count = 0;
+    info->memory_count = info->reserved_count = info->dynamic_reserved_count = 0;
     info->initrd_start = info->initrd_end = 0;
     for (;;) {
         if (reserve > total || total - reserve < 16) return -1;
@@ -79,11 +82,22 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
             f->reserved_root = depth == 1 && equal(b + name, length, "reserved-memory");
             f->reserved_child = depth == 2 && frames[1].reserved_root;
             f->chosen = depth == 1 && equal(b + name, length, "chosen");
+            f->has_reg = f->alloc_range_count = 0;
+            f->dynamic_size = f->dynamic_alignment = 0;
             if (!depth) { if (length) return -1; root_seen = 1; }
             depth++;
             p = (p + 4) & ~(size_t)3;
         } else if (token == 2) { /* END_NODE */
             if (!depth) return -1;
+            struct frame *f = &frames[depth - 1];
+            if (f->reserved_child && !f->has_reg && f->dynamic_size) {
+                if (info->dynamic_reserved_count == FDT_MAX_DYNAMIC_RESERVED) return -1;
+                struct fdt_dynamic_reservation *d = &info->dynamic_reserved[info->dynamic_reserved_count++];
+                d->size = f->dynamic_size;
+                d->alignment = f->dynamic_alignment;
+                d->alloc_range_count = f->alloc_range_count;
+                for (unsigned i = 0; i < f->alloc_range_count; i++) d->alloc_ranges[i] = f->alloc_ranges[i];
+            }
             depth--;
         } else if (token == 3) { /* PROP */
             if (!depth || end - p < 8) return -1;
@@ -104,12 +118,31 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
             } else if ((f->memory || f->reserved_child) && equal(key, n, "reg")) {
                 unsigned ac = f->address_cells, sc = f->size_cells;
                 if (!ac || !sc || length % (4 * (ac + sc))) return -1;
+                if (f->reserved_child) f->has_reg = 1;
                 for (size_t at = 0; at < length; at += 4 * (ac + sc)) {
                     uint64_t base = cells(b + p + at, ac);
                     uint64_t size = cells(b + p + at + 4 * ac, sc);
                     if (f->memory) {
                         if (append(info->memory, &info->memory_count, FDT_MAX_MEMORY, base, size)) return -1;
                     } else if (append(info->reserved, &info->reserved_count, FDT_MAX_RESERVED, base, size)) return -1;
+                }
+            } else if (f->reserved_child && (equal(key, n, "size") || equal(key, n, "alignment"))) {
+                unsigned sc = f->size_cells;
+                if (!sc || length != 4 * sc) return -1;
+                uint64_t v = cells(b + p, sc);
+                if (equal(key, n, "size")) f->dynamic_size = v;
+                else f->dynamic_alignment = v;
+            } else if (f->reserved_child && (equal(key, n, "alloc-ranges") || equal(key, n, "alloc-range"))) {
+                unsigned ac = f->address_cells, sc = f->size_cells;
+                if (!ac || !sc || length % (4 * (ac + sc))) return -1;
+                for (size_t at = 0; at < length; at += 4 * (ac + sc)) {
+                    if (f->alloc_range_count == FDT_MAX_ALLOC_RANGES) return -1;
+                    uint64_t base = cells(b + p + at, ac);
+                    uint64_t size = cells(b + p + at + 4 * ac, sc);
+                    if (base + size < base) return -1;
+                    f->alloc_ranges[f->alloc_range_count].base = base;
+                    f->alloc_ranges[f->alloc_range_count].size = size;
+                    f->alloc_range_count++;
                 }
             } else if (f->chosen && equal(key, n, "linux,initrd-start")) {
                 if (length != 4 && length != 8) return -1;
