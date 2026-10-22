@@ -141,6 +141,10 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
         value("FDT_dynamic_reserved_size", observed_fdt.dynamic_reserved[i].size);
         value("FDT_dynamic_reserved_alignment", observed_fdt.dynamic_reserved[i].alignment);
         value("FDT_dynamic_reserved_alloc_range_count", observed_fdt.dynamic_reserved[i].alloc_range_count);
+        for (unsigned j = 0; j < observed_fdt.dynamic_reserved[i].alloc_range_count; j++) {
+            value("FDT_dynamic_reserved_alloc_base", observed_fdt.dynamic_reserved[i].alloc_ranges[j].base);
+            value("FDT_dynamic_reserved_alloc_size", observed_fdt.dynamic_reserved[i].alloc_ranges[j].size);
+        }
     }
     value("FDT_initrd_start", observed_fdt.initrd_start);
     value("FDT_initrd_end", observed_fdt.initrd_end);
