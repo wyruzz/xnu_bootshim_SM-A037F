@@ -65,6 +65,7 @@ Decoded values from the property snapshot:
 - UART clock names are `baud`, `bus`; node 1 has `clocks = <0x24 0x25 0x16>`, node 2 has `clocks = <0x24 0x25 0x17>`. The provider properties show `clk26m` (`0x24`) has `#clock-cells = 0`, while `infracfg_ao` (`0x25`) has `#clock-cells = 1`; therefore `0x16` / `0x17` are clock-index arguments for `infracfg_ao`, not separate phandles.
 - The UART nodes in this snapshot have no `status` or `pinctrl-0` property. Absence of `status` normally means enabled under DT conventions, but does not prove the UART pins are routed or that the early shim inherits working UART state.
 - `/reserved-memory` contains numerous fixed `reg` reservations, including regions for ATF, TEE, framebuffer, boot arguments, logs, modem and SCP. These must be treated as unavailable unless a later design explicitly proves otherwise.
+- Six children use dynamic `size` requests without `reg`: SSMR/CMA (`0x18000000`), Wi-Fi (`0x300000`), SSPM share (`0x510000`), connectivity (`0x440000`), SCP share (`0x300000`), and ION heap (`0x5000`). Their `alignment` and `alloc-range`/`alloc-ranges` properties constrain allocation, but the snapshot does not give actual assigned bases. The parser now reports these separately and does not treat them as fixed ranges.
 
 The diagnostic source previously used `UART_BASE = 0x11020000`, which conflicts
 with the captured first UART node's `reg` base. It has been corrected to
