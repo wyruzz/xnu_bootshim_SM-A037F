@@ -157,11 +157,11 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
                     f->alloc_range_count++;
                 }
             } else if (f->chosen && equal(key, n, "linux,initrd-start")) {
-                if (length != 4 && length != 8) return -1;
+                if (has_initrd_start || (length != 4 && length != 8)) return -1;
                 info->initrd_start = cells(b + p, length / 4);
                 has_initrd_start = 1;
             } else if (f->chosen && equal(key, n, "linux,initrd-end")) {
-                if (length != 4 && length != 8) return -1;
+                if (has_initrd_end || (length != 4 && length != 8)) return -1;
                 info->initrd_end = cells(b + p, length / 4);
                 has_initrd_end = 1;
             }
