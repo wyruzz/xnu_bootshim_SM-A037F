@@ -119,8 +119,8 @@ __attribute__((noreturn)) void shim_el1(uint64_t dtb)
     value("CNTFRQ_EL0", READ_SYSREG(CNTFRQ_EL0));
     value("CNTVCT_EL0", READ_SYSREG(CNTVCT_EL0));
     value("DTB", dtb);
-    /* Restrict all speculative input parsing to the known low DRAM window. */
-    if (dtb < 0x40000000 || dtb > 0x13fff0000ULL || (dtb & 7) ||
+    /* Keep the entire 1 MiB parser window inside the captured DRAM span. */
+    if (dtb < 0x40000000 || dtb > 0x13ff00000ULL || (dtb & 7) ||
         fdt_inspect((const void *)(uintptr_t)dtb, 0x100000, &observed_fdt)) {
         puts_uart("FDT_INVALID\n");
         stop();
