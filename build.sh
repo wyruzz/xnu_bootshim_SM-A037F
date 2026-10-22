@@ -19,10 +19,16 @@ if "${prefix}readelf" -r "$out/shim.o" "$out/fdt.o" "$out/adt.o" "$out/handoff.o
 fi
 "${prefix}gcc" "${flags[@]}" -static -T "$src/shim.ld" -Wl,--build-id=none \
     -Wl,--fatal-warnings "$out/start.o" "$out/shim.o" "$out/fdt.o" "$out/adt.o" "$out/handoff.o" "$out/rng.o" -o "$out/shim.elf"
-if "${prefix}readelf" -lW "$out/shim.elf" | grep -Eq 'LOAD.*RWE'; then
-    echo 'Refusing shim ELF with a writable-and-executable LOAD segment' >&2
-    exit 1
-fi
+python3 - "${prefix}readelf" "$out/shim.elf" <<'PY_CHECK'
+import subprocess, sys
+text = subprocess.check_output([sys.argv[1], "-lW", sys.argv[2]], text=True)
+for line in text.splitlines():
+    fields = line.split()
+    if fields and fields[0] == "LOAD":
+        flags = "".join(fields[6:-1])
+        if "W" in flags and "E" in flags:
+            raise SystemExit("Refusing shim ELF with a writable-and-executable LOAD segment")
+PY_CHECK
 "${prefix}objcopy" -O binary "$out/shim.elf" "$out/Image"
 "${prefix}nm" "$out/shim.elf" > "$out/symbols.txt"
 python3 - "$out" <<'PY'
