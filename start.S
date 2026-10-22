@@ -58,6 +58,7 @@ halt:
     b exception_report
 .endm
 .balign 2048
+.global vectors
 vectors:
     vector 0
     vector 1
