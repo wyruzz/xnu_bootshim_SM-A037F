@@ -7,7 +7,7 @@ prefix=${CROSS_COMPILE:-aarch64-linux-gnu-}
 mkdir -p "$out"
 flags=(-O2 -ffreestanding -nostdlib -fno-pic -mgeneral-regs-only -mstrict-align
        -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
-       -mcpu=cortex-a35 -Wall -Wextra -Werror)
+       -mcpu=cortex-a53 -Wall -Wextra -Werror)
 "${prefix}gcc" "${flags[@]}" -c "$src/start.S" -o "$out/start.o"
 "${prefix}gcc" "${flags[@]}" -c "$src/shim.c" -o "$out/shim.o"
 "${prefix}gcc" "${flags[@]}" -c "$src/fdt.c" -o "$out/fdt.o"
@@ -30,6 +30,6 @@ with image.open('r+b') as f: f.truncate(syms['_end'])
 b=image.read_bytes()
 assert b[56:60]==b'ARM\x64' and struct.unpack_from('<Q',b,16)[0]==len(b)
 assert syms['_bss_end'] <= syms['_stack_top'] == len(b)
-(p/'build.json').write_text(json.dumps({'kind':'diagnostic-shim','cpu':'cortex-a35','bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'xnu_boot_verified':False,'hardware_tested':False},indent=2)+'\n')
+(p/'build.json').write_text(json.dumps({'kind':'diagnostic-shim','cpu':'cortex-a53','bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'xnu_boot_verified':False,'hardware_tested':False},indent=2)+'\n')
 print(json.dumps({'image':str(image),'bytes':len(b),'hardware_tested':False}))
 PY
