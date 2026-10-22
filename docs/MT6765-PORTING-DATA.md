@@ -23,7 +23,7 @@ the A03s device tree, bootloader behavior, and memory reservations.
 | DTB serial node 2 | node `serial@11030000`; `reg` base `0x11003000`, size `0x1000` | A03s live device-tree property dump |
 | UART clock names | `baud`, `bus` | `clk26m` phandle `0x24` has zero clock cells; `infracfg_ao` phandle `0x25` has one clock cell, so `0x16` / `0x17` are provider arguments, not phandles |
 | DRAM base and size | base `0x40000000`, size `0x100000000` (4 GiB) | `/memory/reg` decoded with root `#address-cells = 2`, `#size-cells = 2` |
-| Reserved memory ranges | Multiple fixed ranges, including ATF/TEE, framebuffer, boot arguments, logs, modem and SCP regions | `/reserved-memory/*/reg` in captured device-tree property tree; see `docs/FDT-EXTRACTION.md` |
+| Reserved memory ranges | Multiple fixed ranges plus six unresolved dynamic reservations (SSMR/CMA, Wi-Fi, SSPM share, connectivity, SCP share, ION heap) | `/reserved-memory/*/reg` in captured device-tree property tree; see `docs/FDT-EXTRACTION.md` |
 | Initrd range | `0x51B00000` to `0x51C61B0D` (end address as encoded) | `/chosen/linux,initrd-start` and `linux,initrd-end` |
 | UART pinmux / effective baud | Not confirmed | UART nodes have no `pinctrl-0` property in this capture; kernel command line says `console=ttyS0,921600n1`, but this alone does not prove shim-time pin state |
 | EL entry level / MMU state | Unknown | Must be measured by the shim on hardware |
@@ -46,6 +46,8 @@ captured tree, not that external serial pins are exposed or that UART output
 will work at shim entry. The live bootargs include `console=ttyS0,921600n1`
 and `mtk_printk_ctrl.disable_uart=1`; these are useful clues, not proof of the
 inherited UART configuration.
+
+Dynamic reservation requests in the captured tree include: SSMR/CMA `0x18000000` aligned to `0x1000000` within the `0xC0000000–0xCFFFFFFF` allocation window; Wi-Fi `0x300000` within `0x40000000–0xBFFFFFFF`; SSPM share `0x510000` within `0x40000000–0x9FFFFFFF`; connectivity `0x440000` within `0x40000000–0xBFFFFFFF`; SCP share `0x300000` within `0x40000000–0x8FFFFFFF`; and ION heap `0x5000` within `0xC0000000–0xCFFFFFFF`. These are allocation requests/constraints from the property snapshot, not proof of the actual assigned physical bases.
 
 ## MT6765 reference-port values (not A03s settings)
 
