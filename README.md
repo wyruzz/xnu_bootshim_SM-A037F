@@ -9,7 +9,7 @@ XNU bootloader.
 ## Current behavior
 
 - Prints entry registers and CPU/system-register diagnostics over the inherited
-  MediaTek UART at `0x11020000`.
+  MediaTek UART at `0x11002000` (the `reg` base reported by the captured A03s Device Tree for `serial@11020000`; UART output is still unverified on hardware).
 - If entered at EL2, reports EL2 state and stops without changing exception
   level or inherited MMU/cache/timer/clock state.
 - If entered at EL1, validates and reports the supplied flattened device tree
