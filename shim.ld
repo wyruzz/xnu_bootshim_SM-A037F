@@ -25,5 +25,14 @@ SECTIONS {
     . = ALIGN(16);
     _stack_top = .;
     _end = .;
+
+    /* Fail the link if architectural alignment assumptions regress. */
+    ASSERT((vectors & 0x7ff) == 0,
+           "AArch64 exception vector table must be 2 KiB aligned")
+    ASSERT((_stack_top & 0xf) == 0,
+           "AArch64 stack top must be 16-byte aligned")
+    ASSERT(_bss_end <= _stack_top,
+           "BSS must end before the diagnostic stack")
+
     /DISCARD/ : { *(.comment) *(.note*) *(.eh_frame*) }
 }
