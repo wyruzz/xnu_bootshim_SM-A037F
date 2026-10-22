@@ -59,7 +59,7 @@ Decoded values from the property snapshot:
 - `/memory/reg = <0 0x40000000 1 0>`: base `0x40000000`, size `0x100000000` (4 GiB).
 - `/chosen/linux,initrd-start = 0x51b00000`; `linux,initrd-end = 0x51c61b0d`.
 - Node `serial@11020000` has `reg = <0 0x11002000 0 0x1000>`; node `serial@11030000` has `reg = <0 0x11003000 0 0x1000>`. The first node's name and register base differ; use `reg` as the register-bank address.
-- UART clock names are `baud`, `bus`; node 1 has clock cells `0x24, 0x25, 0x16`, node 2 has `0x24, 0x25, 0x17`. The phandle targets found are `clk26m` (`0x24`), `infracfg_ao` (`0x25`), interrupt controller (`0x16`) and GPIO (`0x17`); the clock properties are vendor-specific and should not be overinterpreted without the provider binding.
+- UART clock names are `baud`, `bus`; node 1 has `clocks = <0x24 0x25 0x16>`, node 2 has `clocks = <0x24 0x25 0x17>`. The provider properties show `clk26m` (`0x24`) has `#clock-cells = 0`, while `infracfg_ao` (`0x25`) has `#clock-cells = 1`; therefore `0x16` / `0x17` are clock-index arguments for `infracfg_ao`, not separate phandles.
 - The UART nodes in this snapshot have no `status` or `pinctrl-0` property. Absence of `status` normally means enabled under DT conventions, but does not prove the UART pins are routed or that the early shim inherits working UART state.
 - `/reserved-memory` contains numerous fixed `reg` reservations, including regions for ATF, TEE, framebuffer, boot arguments, logs, modem and SCP. These must be treated as unavailable unless a later design explicitly proves otherwise.
 
