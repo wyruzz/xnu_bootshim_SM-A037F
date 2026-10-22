@@ -38,7 +38,18 @@ p=Path(sys.argv[1]); syms={line.split()[2]:int(line.split()[0],16) for line in (
 image=p/'Image'
 with image.open('r+b') as f: f.truncate(syms['_end'])
 b=image.read_bytes()
-assert b[56:60]==b'ARM\x64' and struct.unpack_from('<Q',b,16)[0]==len(b)
+# Validate the AArch64 Image header and prove its first branch lands on _start.
+insn=struct.unpack_from('<I', b, 0)[0]
+assert insn & 0xfc000000 == 0x14000000, 'Image entry must begin with an AArch64 B instruction'
+imm26=insn & 0x03ffffff
+if imm26 & 0x02000000:
+    imm26 -= 0x04000000
+assert imm26 * 4 == syms['_start'], 'Image entry branch does not target _start'
+assert struct.unpack_from('<Q', b, 8)[0] == 0, 'unexpected AArch64 Image text_offset'
+assert struct.unpack_from('<Q', b, 16)[0] == len(b), 'AArch64 Image image_size mismatch'
+assert struct.unpack_from('<Q', b, 24)[0] == 0xa, 'unexpected AArch64 Image flags'
+assert b[32:56] == bytes(24), 'AArch64 Image reserved header fields must be zero'
+assert b[56:60] == b'ARM\\x64'
 assert syms['_bss_end'] <= syms['_stack_top'] == len(b)
 (p/'build.json').write_text(json.dumps({'kind':'diagnostic-shim','cpu':'cortex-a53','bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'xnu_boot_verified':False,'hardware_tested':False},indent=2)+'\n')
 print(json.dumps({'image':str(image),'bytes':len(b),'hardware_tested':False}))
