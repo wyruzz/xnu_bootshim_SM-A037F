@@ -49,7 +49,7 @@ assert struct.unpack_from('<Q', b, 8)[0] == 0, 'unexpected AArch64 Image text_of
 assert struct.unpack_from('<Q', b, 16)[0] == len(b), 'AArch64 Image image_size mismatch'
 assert struct.unpack_from('<Q', b, 24)[0] == 0xa, 'unexpected AArch64 Image flags'
 assert b[32:56] == bytes(24), 'AArch64 Image reserved header fields must be zero'
-assert b[56:60] == bytes((65, 82, 77, 100))
+assert b[56:60] == b'ARMd'
 assert syms['_bss_end'] <= syms['_stack_top'] == len(b)
 (p/'build.json').write_text(json.dumps({'kind':'diagnostic-shim','cpu':'cortex-a53','bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'xnu_boot_verified':False,'hardware_tested':False},indent=2)+'\n')
 print(json.dumps({'image':str(image),'bytes':len(b),'hardware_tested':False}))
