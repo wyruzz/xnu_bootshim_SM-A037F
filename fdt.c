@@ -22,6 +22,10 @@ static uint64_t cells(const unsigned char *p, unsigned count)
 {
     return count == 2 ? be64(p) : be32(p);
 }
+static int overlaps(size_t a, size_t an, size_t b, size_t bn)
+{
+    return an && bn && a < b + bn && b < a + an;
+}
 static int append(struct fdt_range *ranges, unsigned *count, unsigned max,
                   uint64_t base, uint64_t size)
 {
@@ -45,12 +49,14 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
     const unsigned char *b = data;
     struct frame frames[16];
     unsigned depth = 0, root_seen = 0;
-    if (available < 40 || be32(b) != 0xd00dfeed) return -1;
+    if (!data || !info || available < 40 || be32(b) != 0xd00dfeed) return -1;
     uint32_t total = be32(b + 4), off = be32(b + 8), strings = be32(b + 12);
     uint32_t reserve = be32(b + 16), ssize = be32(b + 32), tsize = be32(b + 36);
     if (total > available || total > 0x100000 || total < 40 || be32(b + 20) != 17 ||
         off < 40 || (off & 3) || off > total || tsize > total - off ||
-        strings > total || ssize > total - strings || reserve < 40 || (reserve & 7)) return -1;
+        strings < 40 || strings > total || ssize > total - strings ||
+        reserve < 40 || (reserve & 7)) return -1;
+    if (overlaps(off, tsize, strings, ssize)) return -1;
     info->bytes = total;
     info->memory_count = info->reserved_count = info->dynamic_reserved_count = 0;
     info->initrd_start = info->initrd_end = 0;
@@ -61,6 +67,9 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
         if (!base && !size) break;
         if (append(info->reserved, &info->reserved_count, FDT_MAX_RESERVED, base, size)) return -1;
     }
+    size_t reserve_bytes = reserve - be32(b + 16);
+    if (overlaps(be32(b + 16), reserve_bytes, off, tsize) ||
+        overlaps(be32(b + 16), reserve_bytes, strings, ssize)) return -1;
     size_t end = off + tsize, p = off;
     while (p <= end && end - p >= 4) {
         unsigned token = be32(b + p);
