@@ -19,13 +19,32 @@ the A03s device tree, bootloader behavior, and memory reservations.
 | DTBO partition | `/dev/block/mmcblk0p12` | Device partition symlink dump |
 | VBMeta partition | `/dev/block/mmcblk0p13` | Device partition symlink dump |
 | Recovery partition | `/dev/block/mmcblk0p38` | Device partition symlink dump |
-| DTB serial node candidate 1 | `serial@11020000` | Found in A03s DTB; active UART and pin routing not yet confirmed |
-| DTB serial node candidate 2 | `serial@11030000` | Found in A03s DTB; active UART and pin routing not yet confirmed |
-| Serial node clock names | `baud`, `bus` | DTB properties; clock phandles need full resolution |
-| DRAM base and size | Unknown | Read from a validated live FDT or device-specific memory map |
-| Reserved memory ranges | Unknown | Read from the A03s FDT and cross-check against runtime |
-| UART pinmux / baud rate | Unknown | Must be verified for this board |
+| DTB serial node 1 | node `serial@11020000`; `reg` base `0x11002000`, size `0x1000` | A03s live device-tree property dump; node label differs from `reg` address |
+| DTB serial node 2 | node `serial@11030000`; `reg` base `0x11003000`, size `0x1000` | A03s live device-tree property dump |
+| UART clock names | `baud`, `bus` | DTB properties; phandles `0x24`, `0x25`, `0x16` for node 1 and `0x24`, `0x25`, `0x17` for node 2 |
+| DRAM base and size | base `0x40000000`, size `0x100000000` (4 GiB) | `/memory/reg` decoded with root `#address-cells = 2`, `#size-cells = 2` |
+| Reserved memory ranges | Multiple fixed ranges, including ATF/TEE, framebuffer, boot arguments, logs, modem and SCP regions | `/reserved-memory/*/reg` in captured device-tree property tree; see `docs/FDT-EXTRACTION.md` |
+| Initrd range | `0x51B00000` to `0x51C61B0D` (end address as encoded) | `/chosen/linux,initrd-start` and `linux,initrd-end` |
+| UART pinmux / effective baud | Not confirmed | UART nodes have no `pinctrl-0` property in this capture; kernel command line says `console=ttyS0,921600n1`, but this alone does not prove shim-time pin state |
 | EL entry level / MMU state | Unknown | Must be measured by the shim on hardware |
+
+## A03s diagnostic capture notes
+
+The uploaded `a03s-diagnostics.zip` contains `root/a03s-dt.tar`, a snapshot of
+Device Tree property files. `fdt-path.txt` separately reports `/sys/firmware/fdt`
+with size 195626 bytes; the raw binary FDT itself is not present as a standalone
+file in this archive. The extracted property tree reports root `#address-cells`
+and `#size-cells` as 2 each, model `MT6765V/WB`, and compatible
+`mediatek,MT6765`.
+
+Important UART detail: the first node is named `serial@11020000`, but its
+`reg` property explicitly encodes base `0x11002000` and size `0x1000`. The
+shim's old `UART_BASE=0x11020000` disagreed with that hardware property and has
+been corrected to `0x11002000`. This confirms the register base from the
+captured tree, not that external serial pins are exposed or that UART output
+will work at shim entry. The live bootargs include `console=ttyS0,921600n1`
+and `mtk_printk_ctrl.disable_uart=1`; these are useful clues, not proof of the
+inherited UART configuration.
 
 ## MT6765 reference-port values (not A03s settings)
 
@@ -56,9 +75,10 @@ on the SM-A037F.
 
 ## Next data to extract
 
-- The exact A03s FDT `/memory` reg values and all `reserved-memory` children.
-- The full `serial@11020000` and `serial@11030000` properties, including
-  resolved clock phandles and pinctrl references.
+- The exact FDT pointer supplied to the shim and whether it points to the same
+  tree represented by the captured sysfs property snapshot.
+- Resolve the UART clock phandles and identify board pin routing / inherited
+  UART state; the current property snapshot does not establish pinmux state.
 - The shim's observed entry EL, `CurrentEL`, `SCTLR_ELx`, `DAIF`, and
   supplied FDT pointer on hardware.
 - The existing project's linker script and image packaging assumptions, so
