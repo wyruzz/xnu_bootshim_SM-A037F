@@ -94,7 +94,7 @@ class FdtTests(unittest.TestCase):
         # Corrupt the initrd end property's name offset so the parser no longer
         # recognizes it as the matching property; malformed pairing must fail.
         bad = bytearray(self.blob)
-        needle = b'linux,initrd-end\\0'
+        needle = b'linux,initrd-end\0'
         strings_off = struct.unpack_from('>I', bad, 12)[0]
         strings_size = struct.unpack_from('>I', bad, 32)[0]
         string_table = bytes(bad[strings_off:strings_off + strings_size])
