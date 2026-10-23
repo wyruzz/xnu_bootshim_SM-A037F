@@ -47,6 +47,33 @@ format checks; it does not prove that the image is safe or functional on the
 phone. **The raw `Image` is not a complete Samsung boot image and must not be
 flashed directly.**
 
+## Packaging a diagnostic boot image
+
+After building the shim, create a legacy Android boot image v2 with 2048-byte
+pages:
+
+```sh
+python3 pack_boot_v2.py
+```
+
+This reads `out/bootshim/Image` and writes `boot.img`. To retain the first
+header page from a stock image (including vendor/MTK metadata stored in that
+page), pass it explicitly:
+
+```sh
+python3 pack_boot_v2.py --stock stock_boot.img --output boot.img
+```
+
+The packer replaces the kernel payload and clears the ramdisk, second-stage,
+recovery-DTBO and DTB sizes; it does not copy initrd or DTB data. MTK layouts
+are vendor-specific: the script preserves the stock header page byte-for-byte
+before updating standard Android header fields, but it cannot reconstruct MTK
+metadata located elsewhere in the stock image or guarantee compatibility with
+the Samsung boot chain. Without `--stock`, it creates a generic v2 header and
+does not invent MTK metadata. This is a packaging utility for host-side
+experiments, **not confirmation that the resulting image is flashable or safe
+to boot on the phone**.
+
 ## Safety boundary in this milestone
 
 The legacy build still compiles the ADT, handoff, and RNG interface modules,
