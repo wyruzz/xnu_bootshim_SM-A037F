@@ -9,6 +9,11 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def payload():
+    """Minimal legacy fixture retained for import compatibility with skipped tests."""
+    return bytes(1024)
+
+
 class HandoffTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
