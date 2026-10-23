@@ -47,32 +47,43 @@ format checks; it does not prove that the image is safe or functional on the
 phone. **The raw `Image` is not a complete Samsung boot image and must not be
 flashed directly.**
 
+## Read-only boot image inspection
+
+Use `inspect_boot_image.py` to report standard component offsets for legacy
+Android boot image header versions 0–2 and detect a footer at the end of the
+file. It does not modify the input:
+
+```sh
+python3 inspect_boot_image.py boot.img
+python3 inspect_boot_image.py boot.img --compact
+```
+
+The report is a structural inventory, not an AVB signature verification.
+Unknown Samsung/MediaTek fields are deliberately not interpreted. Use
+`avbtool.py info_image --image boot.img` to inspect AVB descriptors; that
+command also does not by itself prove the device will accept a modified image.
+
 ## Packaging a diagnostic boot image
 
-After building the shim, create a legacy Android boot image v2 with 2048-byte
-pages:
+After building the shim, the experimental `pack_boot_v2.py` can create a
+legacy Android boot image v2 with 2048-byte pages:
 
 ```sh
 python3 pack_boot_v2.py
 ```
 
-This reads `out/bootshim/Image` and writes `boot.img`. To retain the first
-header page from a stock image (including vendor/MTK metadata stored in that
-page), pass it explicitly:
+This reads `out/bootshim/Image` and writes `boot.img`. The optional
+`--stock` argument copies the first page of the supplied image as a header
+template; it does not copy the original kernel, ramdisk, DTB, or arbitrary
+vendor data stored elsewhere in the image. It then clears the standard
+ramdisk, second-stage, recovery-DTBO and DTB size fields.
 
-```sh
-python3 pack_boot_v2.py --stock stock_boot.img --output boot.img
-```
-
-The packer replaces the kernel payload and clears the ramdisk, second-stage,
-recovery-DTBO and DTB sizes; it does not copy initrd or DTB data. MTK layouts
-are vendor-specific: the script preserves the stock header page byte-for-byte
-before updating standard Android header fields, but it cannot reconstruct MTK
-metadata located elsewhere in the stock image or guarantee compatibility with
-the Samsung boot chain. Without `--stock`, it creates a generic v2 header and
-does not invent MTK metadata. This is a packaging utility for host-side
-experiments, **not confirmation that the resulting image is flashable or safe
-to boot on the phone**.
+This is **not** a generic Samsung image reconstruction method. MTK layouts
+are vendor-specific, and preserving a header page does not preserve or
+regenerate AVB metadata/signatures. The packer must be treated as experimental
+until its output layout is compared with a known-good image for the exact
+firmware and the device's boot-chain requirements are understood. Do not
+treat the output as flash-ready.
 
 ## Safety boundary in this milestone
 
