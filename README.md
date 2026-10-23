@@ -72,11 +72,14 @@ legacy Android boot image v2 with 2048-byte pages:
 python3 pack_boot_v2.py
 ```
 
-This reads `out/bootshim/Image` and writes `boot.img`. The optional
-`--stock` argument copies the first page of the supplied image as a header
-template; it does not copy the original kernel, ramdisk, DTB, or arbitrary
-vendor data stored elsewhere in the image. It then clears the standard
-ramdisk, second-stage, recovery-DTBO and DTB size fields.
+This reads `out/bootshim/Image` and writes `boot.img`. The packer now rejects
+inputs without the AArch64 Linux Image magic at offset `0x38`. The optional
+`--stock` argument accepts only a legacy v2 image with 2048-byte pages and a
+valid minimum v2 header size; it copies the first page as a template, but does
+not copy the original kernel, ramdisk, DTB, or arbitrary vendor data stored
+elsewhere in the image. It then clears the standard ramdisk, second-stage,
+recovery-DTBO and DTB size fields. The output path may not overwrite the
+template image.
 
 This is **not** a generic Samsung image reconstruction method. MTK layouts
 are vendor-specific, and preserving a header page does not preserve or
