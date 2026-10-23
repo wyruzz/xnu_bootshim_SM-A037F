@@ -22,9 +22,9 @@ static uint64_t cells(const unsigned char *p, unsigned count)
 {
     return count == 2 ? be64(p) : be32(p);
 }
-static int overlaps(size_t a, size_t an, size_t b, size_t bn)
+static int overlaps(size_t a, size_t a_end, size_t b, size_t b_end)
 {
-    return an && bn && a < b + bn && b < a + an;
+    return a < a_end && b < b_end && a < b_end && b < a_end;
 }
 static int append(struct fdt_range *ranges, unsigned *count, unsigned max,
                   uint64_t base, uint64_t size)
@@ -54,12 +54,18 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
     uint32_t reserve = be32(b + 16), ssize = be32(b + 32), tsize = be32(b + 36);
     uint32_t version = be32(b + 20), last_compatible = be32(b + 24);
     unsigned has_initrd_start = 0, has_initrd_end = 0;
-    if (total > available || total > 0x100000 || total < 40 || version != 17 ||
-        last_compatible > version ||
+    if (total > available || total > 0x100000 || total < 40 ||
+        version < 17 || last_compatible > 17 ||
         off < 40 || (off & 3) || off > total || tsize > total - off ||
         strings < 40 || strings > total || ssize > total - strings ||
-        reserve < 40 || (reserve & 7)) return -1;
-    if (overlaps(off, tsize, strings, ssize)) return -1;
+        reserve < 40 || (reserve & 7) || !tsize) return -1;
+    size_t structure_end = (size_t)off + tsize;
+    size_t strings_end = (size_t)strings + ssize;
+    if (overlaps(0, 40, off, structure_end) ||
+        overlaps(0, 40, strings, strings_end) ||
+        overlaps(be32(b + 16), reserve, off, structure_end) ||
+        overlaps(be32(b + 16), reserve, strings, strings_end) ||
+        overlaps(off, structure_end, strings, strings_end)) return -1;
     info->bytes = total;
     info->memory_count = info->reserved_count = info->dynamic_reserved_count = 0;
     info->initrd_start = info->initrd_end = 0;
@@ -99,6 +105,7 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
             if (!depth) { if (length) return -1; root_seen = 1; }
             depth++;
             p = (p + 4) & ~(size_t)3;
+            if (p > end) return -1;
         } else if (token == 2) { /* END_NODE */
             if (!depth) return -1;
             struct frame *f = &frames[depth - 1];
@@ -166,10 +173,11 @@ int fdt_inspect(const void *data, size_t available, struct fdt_info *info)
                 has_initrd_end = 1;
             }
             p = (p + length + 3) & ~(size_t)3;
+            if (p > end) return -1;
         } else if (token == 4) { /* NOP */
             continue;
         } else if (token == 9) { /* END */
-            if (!root_seen || depth || !info->memory_count ||
+            if (p != end || !root_seen || depth || !info->memory_count ||
                 has_initrd_start != has_initrd_end ||
                 (has_initrd_start && info->initrd_end < info->initrd_start))
                 return -1;

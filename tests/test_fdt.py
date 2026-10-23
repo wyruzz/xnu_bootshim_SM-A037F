@@ -112,6 +112,32 @@ class FdtTests(unittest.TestCase):
                     break
         self.assertNotEqual(self.inspect(bytes(bad))[0], 0)
 
+    def test_null_arguments_are_rejected(self):
+        self.assertEqual(self.lib.fdt_inspect(None, 40, ctypes.byref(Info())), -1)
+        self.assertEqual(self.lib.fdt_inspect(
+            ctypes.create_string_buffer(self.blob), len(self.blob), None), -1)
+
+    def test_header_blocks_must_not_overlap(self):
+        # Structure data may not alias the reservation map or strings block.
+        for value in (
+            struct.unpack_from('>I', self.blob, 16)[0] + 16,
+            struct.unpack_from('>I', self.blob, 12)[0],
+        ):
+            bad = bytearray(self.blob)
+            struct.pack_into('>I', bad, 8, value)
+            with self.subTest(value=value):
+                self.assertNotEqual(self.inspect(bytes(bad))[0], 0)
+
+    def test_forward_compatible_header_version(self):
+        compatible = bytearray(self.blob)
+        struct.pack_into('>I', compatible, 20, 18)
+        struct.pack_into('>I', compatible, 24, 17)
+        self.assertEqual(self.inspect(bytes(compatible))[0], 0)
+
+        incompatible = bytearray(compatible)
+        struct.pack_into('>I', incompatible, 24, 18)
+        self.assertNotEqual(self.inspect(bytes(incompatible))[0], 0)
+
     def test_unsupported_memory_cells_are_rejected(self):
         bad = self.blob.replace(struct.pack('>4I', 0, 0x40000000, 0, 0x40000000),
                                 struct.pack('>4I', 0xffffffff, 0xffffffff, 0, 0x40000000), 1)
