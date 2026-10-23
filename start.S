@@ -111,7 +111,7 @@ el2_to_el1:
 /* Exception vectors used by the diagnostic milestone. */
 .macro vector slot
     .balign 128
-    mov x0, #\\slot
+    mov x0, #\slot
     b exception_report
 .endm
 .balign 2048
