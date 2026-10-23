@@ -25,14 +25,15 @@ class InspectBootImageTests(unittest.TestCase):
         put32(header, 1648, 0)   # DTB size
         image = bytes(header) + b"KER" + bytes(page - 3) + b"RD" + bytes(page - 2)
         if with_footer:
+            original_size = len(image)
+            vbmeta_size = 64
             footer = bytearray(64)
             footer[:4] = b"AVBf"
-            struct.pack_into("<IIQQQ", footer, 4, 1, 0, len(image), len(image), 0)
-            image += bytes(128) + bytes(64)  # placeholder vbmeta region and footer
-            image = image[:-64] + bytes(64)
-            image = image[:-64] + bytes(64)
-            # Put the footer at the end of the full file.
-            image = image[:-64] + footer
+            struct.pack_into(
+                "<IIQQQ", footer, 4, 1, 0,
+                original_size, original_size, vbmeta_size
+            )
+            image += bytes(vbmeta_size) + footer
         return image
 
     def test_reports_v2_component_offsets(self) -> None:
@@ -53,6 +54,7 @@ class InspectBootImageTests(unittest.TestCase):
             report = inspect_boot_image.inspect(path)
         self.assertIsNotNone(report["avb_footer"])
         self.assertEqual(report["avb_footer"]["version"], "1.0")
+        self.assertTrue(report["avb_footer"]["vbmeta_within_file"])
 
 
 if __name__ == "__main__":
