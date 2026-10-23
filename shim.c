@@ -101,7 +101,8 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
     }
     if (el == 4) {
         extern void shim_el1(uint64_t dtb);
-        shim_el1(x0);
+        /* AArch64 Linux Image boot protocol passes the FDT address in x2. */
+        shim_el1(x2);
     }
     /* Leave the inherited watchdog untouched. A later reset is possible. */
     stop();
