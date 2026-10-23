@@ -11,7 +11,7 @@ _head:
     .quad _end
     .quad 0xa
     .quad 0, 0, 0
-    .ascii "ARM\\x64"
+    .ascii "ARM\x64"
     .long 0
 .text
 .global _start
@@ -119,7 +119,7 @@ el2_to_el1:
 /* Exception vectors used by the diagnostic milestone. */
 .macro vector slot
     .balign 128
-    mov x0, #\\slot
+    mov x0, #\slot
     b exception_report
 .endm
 .balign 2048
