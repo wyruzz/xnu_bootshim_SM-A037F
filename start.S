@@ -11,7 +11,7 @@ _head:
     .quad _end
     .quad 0xa
     .quad 0, 0, 0
-    .ascii "ARM\\x64"
+    .ascii "ARM\x64"
     .long 0
 .text
 .global _start
