@@ -41,6 +41,24 @@ writable-and-executable ELF load segments, validate the AArch64 Image magic
 and image-size field, and emit `build.json` with a SHA-256 digest. A GitHub
 Actions workflow builds the image on each push and pull request.
 
+### Optional physical-RAM diagnostic log
+
+`shim.c` contains an opt-in fixed-address log buffer. It records event IDs for
+shim entry, exception-vector entry, FDT validation and the diagnostic stop.
+The default build leaves this feature disabled. To enable it, pass
+`SHIM_RAM_LOG_PHYS_ADDR=0x...` to `build-macos.sh`; **only do this after
+validating and reserving that physical range for the shim on the exact device
+and firmware**. An arbitrary address can corrupt live memory. The current code
+does not verify that a watchdog was disabled, so it deliberately does not log a
+`watchdog_disabled` success event.
+
+This log is ordinary DRAM, not persistent storage. A reset, bootloader, or
+recovery kernel may clear or overwrite it. TWRP's file manager and ordinary
+`dd` commands do not inherently read physical RAM; a separate, trusted
+physical-memory read mechanism is required. No RAM address is configured by
+default, and this feature has not been validated on hardware.
+
+
 Outputs are a raw diagnostic `Image`, `shim.elf`, `symbols.txt`, and
 `build.json`. A successful host build only confirms the compile/link and
 format checks; it does not prove that the image is safe or functional on the
