@@ -11,7 +11,7 @@ _head:
     .quad _end
     .quad 0xa
     .quad 0, 0, 0
-    .ascii "ARM\\x64"
+    .ascii "ARM\x64"
     .long 0
 .text
 .global _start
@@ -46,6 +46,14 @@ _start:
     mov x2, x21
     mov x3, x22
     mov x4, x23
+
+    /* Diagnostic UART marker: write 'A' to the candidate TX register. */
+    movz    x9, #0x2000
+    movk    x9, #0x1100, lsl #16
+    mov     w10, #0x41
+    str     w10, [x9]
+    dsb     sy
+
     bl shim_main
 halt:
     wfe
@@ -111,7 +119,7 @@ el2_to_el1:
 /* Exception vectors used by the diagnostic milestone. */
 .macro vector slot
     .balign 128
-    mov x0, #\\slot
+    mov x0, #\slot
     b exception_report
 .endm
 .balign 2048

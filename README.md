@@ -41,38 +41,70 @@ writable-and-executable ELF load segments, validate the AArch64 Image magic
 and image-size field, and emit `build.json` with a SHA-256 digest. A GitHub
 Actions workflow builds the image on each push and pull request.
 
+### Optional physical-RAM diagnostic log
+
+`shim.c` contains an opt-in fixed-address log buffer. It records event IDs for
+shim entry, exception-vector entry, FDT validation and the diagnostic stop.
+The default build leaves this feature disabled. To enable it, pass
+`SHIM_RAM_LOG_PHYS_ADDR=0x...` to `build-macos.sh`; **only do this after
+validating and reserving that physical range for the shim on the exact device
+and firmware**. An arbitrary address can corrupt live memory. The current code
+does not verify that a watchdog was disabled, so it deliberately does not log a
+`watchdog_disabled` success event.
+
+This log is ordinary DRAM, not persistent storage. A reset, bootloader, or
+recovery kernel may clear or overwrite it. TWRP's file manager and ordinary
+`dd` commands do not inherently read physical RAM; a separate, trusted
+physical-memory read mechanism is required. No RAM address is configured by
+default, and this feature has not been validated on hardware.
+
+
 Outputs are a raw diagnostic `Image`, `shim.elf`, `symbols.txt`, and
 `build.json`. A successful host build only confirms the compile/link and
 format checks; it does not prove that the image is safe or functional on the
 phone. **The raw `Image` is not a complete Samsung boot image and must not be
 flashed directly.**
 
+## Read-only boot image inspection
+
+Use `inspect_boot_image.py` to report standard component offsets for legacy
+Android boot image header versions 0–2 and detect a footer at the end of the
+file. It does not modify the input:
+
+```sh
+python3 inspect_boot_image.py boot.img
+python3 inspect_boot_image.py boot.img --compact
+```
+
+The report is a structural inventory, not an AVB signature verification.
+Unknown Samsung/MediaTek fields are deliberately not interpreted. Use
+`avbtool.py info_image --image boot.img` to inspect AVB descriptors; that
+command also does not by itself prove the device will accept a modified image.
+
 ## Packaging a diagnostic boot image
 
-After building the shim, create a legacy Android boot image v2 with 2048-byte
-pages:
+After building the shim, the experimental `pack_boot_v2.py` can create a
+legacy Android boot image v2 with 2048-byte pages:
 
 ```sh
 python3 pack_boot_v2.py
 ```
 
-This reads `out/bootshim/Image` and writes `boot.img`. To retain the first
-header page from a stock image (including vendor/MTK metadata stored in that
-page), pass it explicitly:
+This reads `out/bootshim/Image` and writes `boot.img`. The packer now rejects
+inputs without the AArch64 Linux Image magic at offset `0x38`. The optional
+`--stock` argument accepts only a legacy v2 image with 2048-byte pages and a
+valid minimum v2 header size; it copies the first page as a template, but does
+not copy the original kernel, ramdisk, DTB, or arbitrary vendor data stored
+elsewhere in the image. It then clears the standard ramdisk, second-stage,
+recovery-DTBO and DTB size fields. The output path may not overwrite the
+template image.
 
-```sh
-python3 pack_boot_v2.py --stock stock_boot.img --output boot.img
-```
-
-The packer replaces the kernel payload and clears the ramdisk, second-stage,
-recovery-DTBO and DTB sizes; it does not copy initrd or DTB data. MTK layouts
-are vendor-specific: the script preserves the stock header page byte-for-byte
-before updating standard Android header fields, but it cannot reconstruct MTK
-metadata located elsewhere in the stock image or guarantee compatibility with
-the Samsung boot chain. Without `--stock`, it creates a generic v2 header and
-does not invent MTK metadata. This is a packaging utility for host-side
-experiments, **not confirmation that the resulting image is flashable or safe
-to boot on the phone**.
+This is **not** a generic Samsung image reconstruction method. MTK layouts
+are vendor-specific, and preserving a header page does not preserve or
+regenerate AVB metadata/signatures. The packer must be treated as experimental
+until its output layout is compared with a known-good image for the exact
+firmware and the device's boot-chain requirements are understood. Do not
+treat the output as flash-ready.
 
 ## Safety boundary in this milestone
 

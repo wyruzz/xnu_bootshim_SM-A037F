@@ -40,3 +40,15 @@ jobs:
           assert image[56:60] == b"ARM\x64"
           print(json.dumps(metadata, indent=2))
           PY
+
+      - name: Publish diagnostic shim artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-shim-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/bootshim/Image
+            ${{ runner.temp }}/bootshim/shim.elf
+            ${{ runner.temp }}/bootshim/symbols.txt
+            ${{ runner.temp }}/bootshim/build.json
+          if-no-files-found: error
+          retention-days: 14
