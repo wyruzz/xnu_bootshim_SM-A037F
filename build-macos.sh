@@ -10,6 +10,16 @@ mkdir -p "$out"
 flags=(-O2 --target=aarch64-none-elf -ffreestanding -nostdlib -fno-pic -mgeneral-regs-only -mstrict-align
        -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables
        -mcpu=cortex-a53 -Wall -Wextra -Werror)
+
+# Optional RAM logging. The caller must supply a board-validated, reserved
+# physical address; never guess one. Disabled by default.
+if [[ -n "${SHIM_RAM_LOG_PHYS_ADDR:-}" ]]; then
+    if [[ ! "${SHIM_RAM_LOG_PHYS_ADDR}" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        echo "SHIM_RAM_LOG_PHYS_ADDR must be a hex literal such as 0x12340000" >&2
+        exit 1
+    fi
+    flags+=("-DSHIM_RAM_LOG_PHYS_ADDR=${SHIM_RAM_LOG_PHYS_ADDR}")
+fi
 "$cc" "${flags[@]}" -c "$src/start.S" -o "$out/start.o"
 "$cc" "${flags[@]}" -c "$src/shim.c" -o "$out/shim.o"
 "$cc" "${flags[@]}" -c "$src/fdt.c" -o "$out/fdt.o"
