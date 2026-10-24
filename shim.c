@@ -8,6 +8,19 @@
 
 static struct fdt_info observed_fdt;
 
+#define MTK_WDT_MODE_REG ((volatile uint32_t *)0x10007000u)
+#define WDT_MODE_EN      (1u << 0)
+#define WDT_MODE_KEY     (0x22u << 24)
+
+static void watchdog_disable(void)
+{
+    uint32_t mode = *MTK_WDT_MODE_REG;
+    mode &= ~WDT_MODE_EN;
+    mode = (mode & 0x00FFFFFFu) | WDT_MODE_KEY;
+    *MTK_WDT_MODE_REG = mode;
+    __asm__ volatile("dsb sy" ::: "memory");
+}
+
 #define READ_SYSREG(reg) ({ uint64_t v; __asm__ volatile("mrs %0, " #reg : "=r"(v)); v; })
 /* A03s live Device Tree: serial@11020000 has reg = <0 0x11002000 0 0x1000>. */
 #define UART_BASE ((uintptr_t)0x11002000)
@@ -54,6 +67,7 @@ __attribute__((noreturn)) static void stop(void)
 
 __attribute__((noreturn)) void exception_report(uint64_t slot)
 {
+    watchdog_disable();
     uint64_t el = READ_SYSREG(CurrentEL);
     puts_uart("XNU_SHIM_EXCEPTION\n");
     value("vector", slot);
@@ -104,7 +118,7 @@ __attribute__((noreturn)) void shim_main(uint64_t x0, uint64_t x1,
         /* AArch64 Linux Image boot protocol passes the FDT address in x2. */
         shim_el1(x2);
     }
-    /* Leave the inherited watchdog untouched. A later reset is possible. */
+    /* Watchdog disable is attempted at shim entry for diagnostics. */
     stop();
 }
 
